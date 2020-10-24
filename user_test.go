@@ -29,11 +29,7 @@ func TestClient_GetUserByID(t *testing.T) {
 			assert.True(t, ok)
 			assert.Equal(t, baseUrl+"/"+fmt.Sprintf("/users/%d", userID), req.URL.String())
 		}).Return(&http.Response{
-			Body: ioutil.NopCloser(
-				bytes.NewReader(
-					[]byte(fmt.Sprintf("{\"id\": %d}", userID)),
-				),
-			),
+			Body:       ioutil.NopCloser(bytes.NewReader([]byte(fmt.Sprintf("{\"id\": %d}", userID)))),
 			StatusCode: http.StatusOK,
 		}, nil)
 
@@ -63,5 +59,22 @@ func TestClient_GetUserByID(t *testing.T) {
 		assert.Error(t, err)
 		assert.True(t, errors.Is(err, expErr))
 		assert.Equal(t, gitlab.User{}, user)
+	})
+
+	t.Run("error on unmarshal response", func(t *testing.T) {
+		httpClient := new(gitlab.MockHTTPClient)
+		httpClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+			Body:       ioutil.NopCloser(bytes.NewReader([]byte("{"))),
+			StatusCode: http.StatusOK,
+		}, nil)
+
+		client := gitlab.NewClient(
+			"test_token",
+			gitlab.WithHttpClient(httpClient),
+		)
+
+		discussion, err := client.GetUserByID(context.Background(), 10)
+		assert.Error(t, err)
+		assert.Equal(t, gitlab.User{}, discussion)
 	})
 }

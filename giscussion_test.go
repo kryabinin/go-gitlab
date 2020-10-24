@@ -33,11 +33,7 @@ func TestClient_GetDiscussion(t *testing.T) {
 			path := fmt.Sprintf("projects/%d/merge_requests/%d/discussions/%s", projectID, mrID, discussionID)
 			assert.Equal(t, baseUrl+"/"+path, req.URL.String())
 		}).Return(&http.Response{
-			Body: ioutil.NopCloser(
-				bytes.NewReader(
-					[]byte(fmt.Sprintf("{\"id\": \"%s\"}", discussionID)),
-				),
-			),
+			Body:       ioutil.NopCloser(bytes.NewReader([]byte(fmt.Sprintf("{\"id\": \"%s\"}", discussionID)))),
 			StatusCode: http.StatusOK,
 		}, nil)
 
@@ -66,6 +62,23 @@ func TestClient_GetDiscussion(t *testing.T) {
 		discussion, err := client.GetDiscussion(context.Background(), 10, 20, "test_discussion")
 		assert.Error(t, err)
 		assert.True(t, errors.Is(err, expErr))
+		assert.Equal(t, gitlab.Discussion{}, discussion)
+	})
+
+	t.Run("error on unmarshal response", func(t *testing.T) {
+		httpClient := new(gitlab.MockHTTPClient)
+		httpClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+			Body:       ioutil.NopCloser(bytes.NewReader([]byte("{"))),
+			StatusCode: http.StatusOK,
+		}, nil)
+
+		client := gitlab.NewClient(
+			"test_token",
+			gitlab.WithHttpClient(httpClient),
+		)
+
+		discussion, err := client.GetDiscussion(context.Background(), 10, 20, "test_discussion")
+		assert.Error(t, err)
 		assert.Equal(t, gitlab.Discussion{}, discussion)
 	})
 }
