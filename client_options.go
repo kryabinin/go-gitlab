@@ -14,6 +14,10 @@ type (
 	withBaseUrl struct {
 		baseUrl string
 	}
+
+	withConcurrency struct {
+		concurrency int
+	}
 )
 
 // WithHttpClient replaces default http client
@@ -32,4 +36,17 @@ func WithBaseUrl(baseUrl string) ClientOption {
 
 func (opt withBaseUrl) apply(c *client) {
 	c.baseUrl = opt.baseUrl
+}
+
+// WithConcurrency set the maximum number of goroutines
+func WithConcurrency(concurrency int) ClientOption {
+	if concurrency == 0 {
+		concurrency = 1
+	}
+
+	return withConcurrency{concurrency: concurrency}
+}
+
+func (opt withConcurrency) apply(c *client) {
+	c.concurrency = opt.concurrency
 }

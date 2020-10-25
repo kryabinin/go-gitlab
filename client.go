@@ -10,9 +10,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"runtime"
 )
 
 const defaultBaseUrl = "http://gitlab.com/api/v4"
+
+var defaultConcurrency = runtime.NumCPU()
 
 // HTTPClient interface to replace default http client
 type HTTPClient interface {
@@ -22,7 +25,10 @@ type HTTPClient interface {
 type (
 	// Client provides api to work with gitlab entities
 	Client interface {
-		// GetUserByID returns user data by id
+		// GetUsersByIDs returns list of users by ids
+		GetUsersByIDs(ctx context.Context, ids []int) ([]User, error)
+
+		// GetUserByID returns single user by id
 		GetUserByID(ctx context.Context, userID int) (User, error)
 
 		// GetDiscussion returns discussion data by project id, merge request id and discussion id
@@ -36,18 +42,20 @@ type (
 	}
 
 	client struct {
-		token      string
-		baseUrl    string
-		httpClient HTTPClient
+		token       string
+		baseUrl     string
+		concurrency int
+		httpClient  HTTPClient
 	}
 )
 
 // NewClient is client constructor
 func NewClient(token string, opts ...ClientOption) Client {
 	c := &client{
-		token:      token,
-		baseUrl:    defaultBaseUrl,
-		httpClient: &http.Client{},
+		token:       token,
+		baseUrl:     defaultBaseUrl,
+		concurrency: defaultConcurrency,
+		httpClient:  &http.Client{},
 	}
 
 	for _, opt := range opts {
@@ -65,6 +73,11 @@ func (c *client) GetParticipants(ctx context.Context, projectID, mrID int, discu
 // GetDiscussion implementation
 func (c *client) GetDiscussion(ctx context.Context, projectID, mrID int, discussionID string) (Discussion, error) {
 	return getDiscussion(ctx, c, projectID, mrID, discussionID)
+}
+
+// GetUsersByIDs implementation
+func (c *client) GetUsersByIDs(ctx context.Context, ids []int) ([]User, error) {
+	return getUsersByIDs(ctx, c, ids)
 }
 
 // GetUserByID implementation

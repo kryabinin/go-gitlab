@@ -15,6 +15,84 @@ import (
 	"github.com/kryabinin/go-gitlab"
 )
 
+func TestClient_GetUsersByIDs(t *testing.T) {
+	t.Run("positive case", func(t *testing.T) {
+		for _, concurrency := range []int{0, 1, 2, 3, 4} {
+			var (
+				im = map[int]struct{}{
+					5:  {},
+					10: {},
+					15: {},
+				}
+				ids = make([]int, 0, len(im))
+			)
+
+			httpClient := new(gitlab.MockHTTPClient)
+			for id := range im {
+				ids = append(ids, id)
+
+				httpClient.On("Do", mock.AnythingOfType("*http.Request")).
+					Return(&http.Response{
+						Body:       ioutil.NopCloser(bytes.NewReader([]byte(fmt.Sprintf("{\"id\": %d}", id)))),
+						StatusCode: http.StatusOK,
+					}, nil).
+					Once()
+			}
+
+			client := gitlab.NewClient(
+				"test_token",
+				gitlab.WithConcurrency(concurrency),
+				gitlab.WithHttpClient(httpClient),
+			)
+
+			users, err := client.GetUsersByIDs(context.Background(), ids)
+			assert.NoError(t, err)
+			assert.Equal(t, len(ids), len(users))
+			for _, user := range users {
+				_, ok := im[user.ID]
+				assert.True(t, ok)
+			}
+		}
+	})
+
+	t.Run("error on getting user", func(t *testing.T) {
+		expErr := errors.New("test error")
+
+		for _, concurrency := range []int{0, 1, 2, 3, 4} {
+			var (
+				im = map[int]error{
+					6:  nil,
+					11: expErr,
+					16: nil,
+				}
+				ids = make([]int, 0, len(im))
+			)
+
+			httpClient := new(gitlab.MockHTTPClient)
+			for id, err := range im {
+				ids = append(ids, id)
+
+				httpClient.On("Do", mock.AnythingOfType("*http.Request")).
+					Return(&http.Response{
+						Body:       ioutil.NopCloser(bytes.NewReader([]byte(fmt.Sprintf("{\"id\": %d}", id)))),
+						StatusCode: http.StatusOK,
+					}, err).
+					Once()
+			}
+
+			client := gitlab.NewClient(
+				"test_token",
+				gitlab.WithConcurrency(concurrency),
+				gitlab.WithHttpClient(httpClient),
+			)
+
+			users, err := client.GetUsersByIDs(context.Background(), ids)
+			assert.True(t, errors.Is(err, expErr))
+			assert.Equal(t, []gitlab.User(nil), users)
+		}
+	})
+}
+
 func TestClient_GetUserByID(t *testing.T) {
 	t.Run("positive case", func(t *testing.T) {
 		var (
